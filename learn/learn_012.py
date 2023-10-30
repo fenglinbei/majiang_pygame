@@ -8,7 +8,7 @@ import copy
 from pygame.locals import *
 
 from random import randint, choice
-from Vector import Vec2d
+from Source.Majiang.Vector import Vec2d
 
 
 class State(object):

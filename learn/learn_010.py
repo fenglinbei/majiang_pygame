@@ -1,7 +1,7 @@
 import pygame
 from pygame.locals import *
 from sys import exit
-from Vector import Vec2d
+from Source.Majiang.Vector import Vec2d
 from random import *
 
 pygame.init()

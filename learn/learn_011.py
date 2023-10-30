@@ -4,7 +4,7 @@ sprite_image_filename = 'data/image/bottle.jpeg'
 import pygame
 from pygame.locals import *
 from sys import exit
-from Vector import Vec2d
+from Source.Majiang.Vector import Vec2d
 from math import *
 
 pygame.init()

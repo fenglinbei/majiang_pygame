@@ -3,11 +3,15 @@ from pygame.locals import *
 from sys import exit
 
 
-class mjPic:
-    def __init__(self, front_path, back_path, font_path):
-        self.img = pygame.image.load(front_path)
-        self.green = pygame.image.load(back_path)
-        self.font = pygame.image.load(font_path)
+class Processor:
+    def __init__(self,
+                 card_front_image_path: str,
+                 card_back_image_path: str,
+                 font_image_path: str
+                 ):
+        self.card_front = pygame.image.load(card_front_image_path)
+        self.card_back = pygame.image.load(card_back_image_path)
+        self.font = pygame.image.load(font_image_path)
         self.img_list = self.convert()
         self.font_list = self.convert_font()
         self.num_list = [2, 16, 30, 44, 58, 60, 74, 88, 102,
@@ -17,7 +21,7 @@ class mjPic:
 
     def convert(self):
         img_list = []
-        img = self.img.subsurface((73, 139), (467, 666))
+        img = self.card_front.subsurface((73, 139), (467, 666))
         w, h = img.get_width(), img.get_height()
         ph = h / 12
         pw = w / 12
