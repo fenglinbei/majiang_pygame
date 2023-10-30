@@ -1,11 +1,11 @@
 # 参数获取
 import os
 
-import dotenv
+# import dotenv
 
 from utils.constants import Player
 
-dotenv.load_dotenv()
+# dotenv.load_dotenv()
 
 DEFAULTS = {
     'GAME_VERSION': 'V1.0',

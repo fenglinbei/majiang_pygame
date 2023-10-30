@@ -1,4 +1,5 @@
 import pygame
+import asyncio
 
 from pygame import Surface
 from typing import List
@@ -203,8 +204,7 @@ class Game:
                 self.click_button(button)
                 break
 
-
-if __name__ == "__main__":
+async def main():
     print(config.__dict__)
     game = Game("FIVE CHESS " + config.GAME_VERSION)
     while True:
@@ -219,3 +219,7 @@ if __name__ == "__main__":
                 mouse_x, mouse_y = pygame.mouse.get_pos()
                 game.mouseClick(mouse_x, mouse_y)
                 game.check_buttons(mouse_x, mouse_y)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
