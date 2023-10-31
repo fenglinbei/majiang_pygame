@@ -1,9 +1,13 @@
 import pygame
 
-if __name__ == "__main__":
+from config import config
+from element.elements import Table
+
+def run():
     pygame.init()
-    screen = pygame.display.set_mode(SCREEN_SIZE, 0, 32)
-    font = pygame.font.SysFont("arial", 36)
+    screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), 0, 32)
+    font = pygame.font.SysFont("arial", config.FONT_SIZE)
+
 
     table = Table()
     manager = mj_manager.Manager(table, mode=0)

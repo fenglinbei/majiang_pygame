@@ -1,15 +1,14 @@
-from Source.Majiang.Vector import Vec2d
+from Source.Majiang.utils.vector import Vec2d
 import copy
-import Source.Majiang.mjsource as mjsource
+import Source.Majiang.assets_processor.processor as processor
 import pygame
-import Source.Majiang.mj_manager as mj_manager
+import Source.Majiang.logic.logic as logic
 from pygame.locals import *
 from Source.Majiang.mj_AI import AI
 from sys import exit
 
-SCREEN_SIZE = (960, 960)
-CENTER_POS = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
-RADIUS = SCREEN_SIZE[0] / 6
+
+
 
 
 class StateMachine(object):
@@ -504,7 +503,7 @@ class Printer(object):
         self.path = './data/image/img.png'
         self.back = './data/image/green.png'
         self.font = './data/image/font.png'
-        self.src = mjsource.mjPic(self.path, self.back, self.font)
+        self.src = processor.mjPic(self.path, self.back, self.font)
         self.img_dic = {1: [], 2: [], 3: [], 4: []}
         self.img_dic_put = {1: [], 2: [], 3: [], 4: []}
         card_img = self.src[0]
@@ -723,94 +722,4 @@ class Printer(object):
         else:
             self.text = 'game    over'
             self.text_2 = ''
-
-
-class Table(object):
-    def __init__(self):
-        self.back_ground = pygame.surface.Surface(SCREEN_SIZE).convert()
-        self.back_ground.fill((255, 255, 255))
-        pygame.draw.circle(self.back_ground, (200, 255, 200), CENTER_POS, RADIUS)
-        self.entities = {}
-
-    def add_entity(self, entity):
-        self.entities[entity.id] = entity
-
-    def remove_entity(self, entity_id):
-        del self.entities[entity_id]
-
-    def reset_entity(self):
-        self.entities = {}
-
-    def reset_player_card(self):
-        new_entities = copy.copy(self.entities)
-        for entity in self.entities.values():
-            if entity.is_player_card:
-                del new_entities[entity.id]
-        self.entities = new_entities
-
-    def pos_in_card(self, pos, now_player):
-        entities2 = copy.copy(self.entities)
-        for entity in entities2.values():
-            location = entity.location[0], entity.location[1]
-            size = entity.size
-            if 0 <= (pos[0] - location[0]) <= size[0] and \
-                    0 <= (pos[1] - location[1]) <= size[1] and entity.player == now_player:
-                return entity.id
-        return -1
-
-    def get(self, entity_id):
-        return self.entities[entity_id]
-
-    def process(self, time_passed):
-        time_passed_seconds = time_passed / 1000.0
-        entities2 = copy.copy(self.entities)
-        for entity in entities2.values():
-            entity.process(time_passed_seconds)
-
-    def render(self, surface, show_player_list=[]):
-        surface.blit(self.back_ground, (0, 0))
-        for entity in self.entities.values():
-            if entity.player in show_player_list:
-                entity.render_front(surface)
-            else:
-                entity.render(surface)
-
-
-class Card(object):
-
-    def __init__(self, image, back):
-        self.image = image
-        self.back_image = back
-        self.cls = 0
-        self.id = 0
-        self.size = [image.get_width(), image.get_height()]
-        self.location = Vec2d(0, 0)
-        self.destination = Vec2d(0, 0)
-        self.player = 0
-        self.speed = 450
-        self.show_flag = False
-        self.can_followed = True
-        self.is_player_card = True  # 是否为玩家的手牌
-        self.init_location = self.location
-
-    def render(self, surface):
-        if not self.show_flag:
-            x, y = self.location
-            surface.blit(self.back_image, (x, y))
-        else:
-            x, y = self.location
-            surface.blit(self.image, (x, y))
-
-    def render_front(self, surface):
-        x, y = self.location
-        surface.blit(self.image, (x, y))
-
-    def process(self, time_passed):
-        if self.speed > 0. and self.location != self.destination:
-            vec_to_destination = self.destination - self.location
-            distance_to_destination = vec_to_destination.get_length()
-            heading = vec_to_destination.normalized()
-            travel_distance = min(distance_to_destination, time_passed * self.speed)
-            self.location += travel_distance * heading
-
 

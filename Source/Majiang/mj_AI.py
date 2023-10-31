@@ -1,7 +1,7 @@
 import copy
 import Source.Majiang.AI2 as AI2
 import sys
-import Source.Majiang.mj_manager as mj_manager
+import Source.Majiang.logic.logic as logic
 
 L_SCORE = 1000
 S_3_SCORE = 1000
