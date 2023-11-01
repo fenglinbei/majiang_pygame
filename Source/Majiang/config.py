@@ -1,6 +1,6 @@
 # 参数获取
 import os
-from utils.constants import CardMode
+from utils.constants import CardMode, PlayerType
 
 DEFAULTS = {
     'GAME_VERSION': 'V1.0',
@@ -30,6 +30,14 @@ class BaseConfig:
     def __init__(self) -> None:
         self.CARD_MODE = CardMode.NOT_HUA
         self.INIT_CARD_NUMS = 13
+        self.TIDY_CARD = True
+        self.INIT_PLAYER = PlayerType.DONG
+
+class AssetConfig:
+    def __init__(self) -> None:
+        self.CARD_FACE_PATH = './Assets/Majiang/img.png'
+        self.CARD_BACK_PATH = './Assets/Majiang/green.png'
+        self.FONT_PATH = './Assets/Majiang/font.png'
 
 class AIConfig:
 
@@ -42,14 +50,10 @@ class AIConfig:
         self.SCORE_THREE, self.SCORE_STHREE, self.SCORE_TWO, self.SCORE_STWO = 4900, 600, 2450, 300
 
 
-class Config:
+class RenderConfig:
     """ Configuration class. """
 
     def __init__(self):
-        self.ai = AIConfig()
-
-        self.GAME_VERSION = get_env('GAME_VERSION')
-
         self.SCREEN_WIDTH = get_env('SCREEN_WIDTH')
         self.SCREEN_HEIGHT = get_env('SCREEN_HEIGHT')
         self.FONT_SIZE = get_env('FONT_SIZE')
@@ -59,5 +63,6 @@ class Config:
 
         self.CARD_MOVEMENT_SPEED = get_env('CARD_MOVEMENT_SPEED')
 
-config = Config()
+render_config = RenderConfig()
 base_config = BaseConfig()
+asset_config = AssetConfig()

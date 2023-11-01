@@ -49,3 +49,10 @@ class Hua(IntEnum):
     LAN = 12
     ZHU = 13
     JU = 14
+    
+class InterruptState(IntEnum):
+    GUO = 0
+    PENG = 1
+    GANG = 2
+    CHI = 3
+    HU = 4

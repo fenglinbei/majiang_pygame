@@ -1,7 +1,7 @@
 import pygame
 
 from pygame import Surface
-from typing import List
+from typing import List, Dict
 from pygame.locals import (
     QUIT,
     KEYDOWN,
@@ -21,10 +21,18 @@ CARD_FACE_NUMS = [
 
 class Asset:
 
-    def __init__(self, card_faces: List[Surface], card_back: Surface, fonts: List[Surface]) -> None:
+    def __init__(self, card_faces: List[Surface], card_back: Surface, fonts: Dict[str, Surface]) -> None:
         self.card_faces = card_faces
         self.card_back = card_back
         self.fonts = fonts
+        
+        self.card_size = (card_back.get_width(), card_back.get_height())
+        self.card_width = card_back.get_width()
+        self.card_height = card_back.get_height()
+        
+        self.font_size = (fonts[0].get_width(), fonts[0].get_height())
+        self.font_width = fonts[0].get_width()
+        self.font_height = fonts[0].get_height()
 
 class Processor:
     def __init__(self,
@@ -78,7 +86,12 @@ class Processor:
         font_gang = font_asset.subsurface(pygame.Rect(2 * w / 4 + 8, 0, h, h))
         font_guo = font_asset.subsurface(pygame.Rect(3 * w / 4 + 13, 0, h, h))
 
-        return [font_hu, font_peng, font_gang, font_guo]
+        return {
+            "hu": font_hu, 
+            "peng": font_peng,
+            "gang": font_gang, 
+            "guo": font_guo
+            }
 
 
 

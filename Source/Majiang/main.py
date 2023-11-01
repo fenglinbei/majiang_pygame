@@ -1,17 +1,19 @@
 import pygame
 
-from config import config
-from element.elements import Table
+from config import render_config, base_config
+from Source.Majiang.entity.entities import Table
+from logic.logic import Logic
+from render.render import Render
 
 def run():
     pygame.init()
-    screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), 0, 32)
-    font = pygame.font.SysFont("arial", config.FONT_SIZE)
+    screen = pygame.display.set_mode((render_config.SCREEN_WIDTH, render_config.SCREEN_HEIGHT), 0, 32)
+    font = pygame.font.SysFont("arial", render_config.FONT_SIZE)
 
 
     table = Table()
-    manager = mj_manager.Manager(table, mode=0)
-    printer = Printer(table)
+    logic = Logic(table, card_mode=base_config.CARD_MODE)
+    render = Render(table)
 
     w, h = screen.get_width(), screen.get_height()
     text = ''
@@ -28,12 +30,13 @@ def run():
     show_player_list = [1]
     show_flag = False
 
-    manager.reset()
-    manager.tidy_card(manager.player_list)
-
-    printer.read_card(manager.player_list, manager.table_card)
+    logic.init_game()
+    render.load_all_cards(logic.all_cards)
+    
     clock = pygame.time.Clock()
-    player = 1
+    
+    player = logic.players[base_config.INIT_PLAYER]
+    
     player_1 = Player(1, manager, printer, use_ai=False)
     player_1.brain.set_state('drawing')
     players = [player_1]
