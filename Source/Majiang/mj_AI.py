@@ -1,7 +1,7 @@
 import copy
 import Source.Majiang.AI2 as AI2
 import sys
-import Source.Majiang.logic.logic as logic
+import Source.Majiang.logic.referee as referee
 
 L_SCORE = 1000
 S_3_SCORE = 1000

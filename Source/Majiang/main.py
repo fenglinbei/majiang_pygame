@@ -2,7 +2,7 @@ import pygame
 
 from config import render_config, base_config
 from Source.Majiang.entity.entities import Table
-from logic.logic import Logic
+from Source.Majiang.logic.referee import Logic
 from render.render import Render
 
 def run():
