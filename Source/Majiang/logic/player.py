@@ -1,8 +1,9 @@
 from typing import List
 
-from logic.state import StateMachine
+from logic.state import StateMachine, GameState
 from utils.constants import PlayerType
 from logic.elements import LogicCard, Cards
+
 
 
 class Player:

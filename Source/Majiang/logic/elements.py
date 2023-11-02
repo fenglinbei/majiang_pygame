@@ -1,7 +1,6 @@
 import random
 
 from typing import Optional, List, Dict
-from collections import OrderedDict
 
 from utils.constants import CardType, CardMode, BASE_CARD_TYPE, Feng, Jian, Hua
 
@@ -13,7 +12,7 @@ class LogicCard:
         self.cls = card_cls
     
     def __repr__(self) -> str:
-        return f"Card: {self.type} num: {self.num} cls: {self.cls} id: {self.id}"
+        return f"<Card: {self.type}, num: {self.num}, cls: {self.cls}, id: {self.id}>"
     
     def __eq__(self, __value: object) -> bool:
         if __value.id == self.id:
@@ -23,17 +22,35 @@ class LogicCard:
             
 class Cards:
     
-    def __init__(self, card_mode: Optional[CardMode] = None) -> None:
-        if card_mode:
+    def __init__(self, card_list: Optional[List[LogicCard]] = None, card_mode: Optional[CardMode] = None) -> None:
+        if card_mode is not None:
             self.items = self.init_cards(card_mode)
-        else:
+        elif not card_list:
             self.items: Dict = {}
+        elif card_list:
+            self.items = {card.id: card for card in card_list}
     
     def __getitem__(self, index: int) -> LogicCard:
-        return list(self.items.values)[index]
+        return list(self.items.values())[index]
     
     def __delitem__(self, index: int):
         del self.items[index]
+        
+    def __add__(self, x):
+        if isinstance(x, Cards):
+            self.update(x)
+            return self
+        elif isinstance(x, LogicCard):
+            self.items[x.id] = x
+            return self
+
+        return None
+
+    def __repr__(self) -> str:
+        return self.to_list().__repr__()
+    
+    def update(self, x):
+        self.items.update(x.items)
     
     def add(self, card: LogicCard):
         self.items[card.id] = card
@@ -61,18 +78,18 @@ class Cards:
         del self.items[card.id]
         return random.sample(list(self.items.values()), k=1)[0]
     
-    def draw(self, nums: int) -> List[LogicCard]:
-        card_list = random.sample(list(self.items.values()), k=nums)
-        for card in card_list:
-            del self.items[card.id]
-        return card_list
-        
+    def draw(self, nums: int, replace: bool = False):
+        card_list: List[LogicCard] = random.sample(list(self.items.values()), k=nums)
+        if not replace:
+            for card in card_list:
+                del self.items[card.id]
+        return Cards(card_list)
+            
     @staticmethod
     def init_cards(card_mode: CardMode):
         card_id = 0
         card_cls = 0
-        cards: OrderedDict[int, LogicCard] = []
-
+        cards: Dict[int, LogicCard] = {}
         for card_type in CardType:
 
             if card_type in BASE_CARD_TYPE:

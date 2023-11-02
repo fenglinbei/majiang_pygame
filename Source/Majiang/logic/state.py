@@ -4,78 +4,14 @@ import pygame
 from typing import Dict, List
 
 from utils.vector import Vec2d
-from logic.player import Player
-from logic.logic import Referee, Cards
-
+# from logic.player import Player
+from logic.referee import Referee
+from logic.elements import Cards
 from entity.entities import Table
 from config import render_config, base_config
 from utils.constants import PlayerType, InterruptState, CardType
 
-class GameState:
-    def __init__(self, table: Table) -> None:
-        self.cards = Cards(card_mode=base_config.CARD_MODE)
-        self.players = self.init_player()
-        
-        self.last_player = base_config.INIT_PLAYER
-        self.interrupt_player = PlayerType.EMPTY
-        
-        self.table = table
-    
-    def init_player(self):
-        players: List[Player] = []
-        for player_type in PlayerType:
-            if player_type == PlayerType.EMPTY:
-                continue
-            if player_type == base_config.INIT_PLAYER:
-                players.append(Player(player_type, use_ai=False))
-            else:
-                players.append(Player(player_type, use_ai=True))
-        return players
-    
-    def check_interrupt(self, card_id: int, now_player: PlayerType, is_putting: bool = False, is_drawing: bool = False):
-        interrupt_states = [InterruptState.GUO]
-        interrupt_card = self.cards[card_id]
-        self.last_player = now_player
-        
-        if is_putting:
-            if interrupt_card.type == CardType.HUA:
-                return []
-            
-            for player in self.players:
-                if player.player_type == now_player:
-                    continue
-                all_duizi = Referee.get_all_kezi(player.hands, k_count=2)
-                all_kezi = Referee.get_all_kezi(player.hands, k_count=3)
-                
-                for duizi in all_duizi:
-                    if put_cls in list(map(lambda x: x.cls, duizi)):
-                        for kezi in all_kezi:
-                            if put_cls in list(map(lambda x: x.cls, kezi)):
-                                interrupt_states.append(InterruptState.PENG)
-                                interrupt_states.append(InterruptState.GANG)
-                                
-                                self.interrupt_player = player
-                                return interrupt_states
-                        interrupt_states.append(InterruptState.PENG)
-                        self.interrupt_player = player
-                        return interrupt_states
-                    
-            return []
-        elif is_drawing:
-            if len(self.players[now_player].pengs + Referee.get_all_kezi(self.players[now_player].hands, k_count=3)) > 0:
-                 interrupt_states.append(InterruptState.GANG)
-            if Referee.check_win(self.players[now_player].hands + )
-    
-    def check_state(self, card_id: int, LogicCard_list):
-        state_list = []
-        LogicCard = self.get(card_id)
-        LogicCard_list['now_LogicCard'].append(LogicCard)
-        k_count = self.loop_k(LogicCard_list['now_LogicCard'] + LogicCard_list['put_LogicCard']['p'], k_count=4, l_cls=[])
-        if len(k_count['cls']) > 0:
-            state_list.append('gang')
-        if self.judge(LogicCard_list['now_LogicCard'])['is_win']:
-            state_list.append('hu')
-        return state_list
+
             
         
 
@@ -539,5 +475,73 @@ class Wait(State):
                 return 'drawing'
             else:
                 return None
+        
 
-
+class GameState:
+    def __init__(self, table: Table) -> None:
+        self.cards = Cards(card_mode=base_config.CARD_MODE)
+        self.players = self.init_player()
+        
+        self.last_player = base_config.INIT_PLAYER
+        self.interrupt_player = PlayerType.EMPTY
+        
+        self.table = table
+    
+    def init_player(self):
+        players: List[Player] = []
+        for player_type in PlayerType:
+            if player_type == PlayerType.EMPTY:
+                continue
+            if player_type == base_config.INIT_PLAYER:
+                players.append(Player(player_type, use_ai=False))
+            else:
+                players.append(Player(player_type, use_ai=True))
+        return players
+    
+    def check_interrupt(self, card_id: int, now_player: PlayerType, is_putting: bool = False, is_drawing: bool = False):
+        interrupt_states = [InterruptState.GUO]
+        interrupt_card = self.cards[card_id]
+        self.last_player = now_player
+        
+        if is_putting:
+            if interrupt_card.type == CardType.HUA:
+                return []
+            
+            for player in self.players:
+                if player.player_type == now_player:
+                    continue
+                all_duizi = Referee.get_all_kezi(player.hands, k_count=2)
+                all_kezi = Referee.get_all_kezi(player.hands, k_count=3)
+                
+                for duizi in all_duizi:
+                    if put_cls in list(map(lambda x: x.cls, duizi)):
+                        for kezi in all_kezi:
+                            if put_cls in list(map(lambda x: x.cls, kezi)):
+                                interrupt_states.append(InterruptState.PENG)
+                                interrupt_states.append(InterruptState.GANG)
+                                
+                                self.interrupt_player = player
+                                return interrupt_states
+                        interrupt_states.append(InterruptState.PENG)
+                        self.interrupt_player = player
+                        return interrupt_states
+                    
+            return []
+        elif is_drawing:
+            if len(self.players[now_player].pengs + Referee.get_all_kezi(self.players[now_player].hands, k_count=3)) > 0:
+                 interrupt_states.append(InterruptState.GANG)
+            if Referee.check_win(self.players[now_player].hands + interrupt_card):
+                interrupt_states.append(InterruptState.HU)
+            
+            return interrupt_states
+    
+    def check_state(self, card_id: int, LogicCard_list):
+        state_list = []
+        LogicCard = self.get(card_id)
+        LogicCard_list['now_LogicCard'].append(LogicCard)
+        k_count = self.loop_k(LogicCard_list['now_LogicCard'] + LogicCard_list['put_LogicCard']['p'], k_count=4, l_cls=[])
+        if len(k_count['cls']) > 0:
+            state_list.append('gang')
+        if self.judge(LogicCard_list['now_LogicCard'])['is_win']:
+            state_list.append('hu')
+        return state_list
