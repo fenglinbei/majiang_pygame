@@ -4,15 +4,12 @@ import pygame
 from typing import Dict, List
 
 from utils.vector import Vec2d
-# from logic.player import Player
 from logic.referee import Referee
+from game_state import GameState
+from config import render_config
+from utils.constants import PlayerType
 from logic.elements import Cards
-from entity.entities import Table
-from config import render_config, base_config
-from utils.constants import PlayerType, InterruptState, CardType
-
-
-            
+from render.render import LOCATION_AND_SIZE
         
 
 class State(object):
@@ -40,12 +37,12 @@ class StateMachine(object):
     def add_state(self, state: State):
         self.states[state.name] = state
 
-    def think(self, state: GameState):
+    def think(self, game_state):
         if self.active_state is None:
             return
-        self.active_state.do_actions(state)
+        self.active_state.do_actions(game_state)
         
-        new_state_name = self.active_state.check_conditions()
+        new_state_name = self.active_state.check_conditions(game_state)
         if new_state_name is not None:
             self.set_state(new_state_name)
 
@@ -56,10 +53,9 @@ class StateMachine(object):
         self.active_state.entry_actions()
 
 
-
 class PutCard(State):
     """打出一张牌"""
-    def __init__(self, player: Player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'putting')
         self.player = player
         self.card_is_choice = False
@@ -70,8 +66,7 @@ class PutCard(State):
     def do_actions(self, state: GameState):
         if self.player.use_ai:
             if not self.card_is_choice:
-                self.last_put_card_id = self.player.AI.put_card(manager.player_list[self.player.player]['now_card'],
-                                                                manager.table_card, self.player.player)[0]
+                self.last_put_card_id = self.player.AI.put_card()[0]
                 self.card_is_choice = True
                 self.card = self.player.manager.table.get(self.last_put_card_id)
                 self.card.destination = Vec2d(*render_config.CENTER_POS)
@@ -89,19 +84,19 @@ class PutCard(State):
             
             # 如果鼠标按下，则获取按下位置的entity_id
             if pressed_mouse[0]:
-                self.choice_entity_id = state.table.follow_mouse(mouse_point, self.last_put_card_id, self.player.player_type)
+                self.choice_entity_id = state.table.follow_mouse(mouse_point, self.last_put_card_id, self.player)
             else:
                 if self.choice_entity_id > 0 and \
                    (render_config.CENTER_POS[0] - render_config.RADIUS < mouse_point[0] < render_config.CENTER_POS[0] + render_config.RADIUS) and \
                    (render_config.CENTER_POS[1] - render_config.RADIUS < mouse_point[1] < render_config.CENTER_POS[1] + render_config.RADIUS):
                 
                     self.card_is_arrived = True
-                    self.player.put_card(self.choice_entity_id)
+                    # self.player.put_card(self.choice_entity_id)
                     return
                 self.choice_entity_id = 0
             self.card_is_arrived = False
 
-    def check_conditions(self):
+    def check_conditions(self, **args):
         if self.card_is_arrived:
             return 'waiting'
         else:
@@ -109,8 +104,10 @@ class PutCard(State):
 
     def exit_actions(self, state: GameState):
         if self.card_is_arrived:
-            state.last_player = self.player.player_type
-            state.check_interrupt(self.choice_entity_id, self.player.player_type)
+            state.last_player = self.player
+            interrupt_states = state.check_interrupt(self.choice_entity_id, self.player.player_type)
+            if not interrupt_states:
+                state.players[self.player].put_card(self.choice_entity_id)
 
         self.choice_entity_id = -1
         self.card_is_arrived = False
@@ -119,281 +116,246 @@ class PutCard(State):
 
 class DrawCard(State):
     """摸牌"""
-    def __init__(self, player: Player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'drawing')
         self.player = player
+        self.draw_card = None
 
     def do_actions(self, state: GameState):
-        self.player.draw_card = state.cards.draw_one()
+        self.draw_card = state.cards.draw_one()
+        
 
-    def check_conditions(self):
-        state_list = self.player.manager.check_state(self.player.draw_card_id,
-                                                     copy.deepcopy(self.player.manager.player_list[self.player.player]))
-        state_list.append('guo')
-        self.player.choice_state_list = state_list
-        if len(state_list) == 1:
-            if len(self.player.manager.card) == 1:
-                return 'hu'
-            return 'putting'
+    def check_conditions(self, state: GameState):
+        states = state.check_interrupt(self.draw_card.id, self.player, is_drawing=True)
+        
+        if states:
+            return 'choosing' 
         else:
-            return 'choosing'
+            return 'putting'
 
-    def exit_actions(self):
-        self.player.manager.player_list[self.player.player]["now_card"].append(self.player.manager.card[0])
-        self.player.manager.card.remove(self.player.manager.card[0])
-        self.player.printer.read_card(self.player.manager.player_list, self.player.manager.table_card)
-        self.player.printer.load_card(14)
+    def exit_actions(self, state: GameState):
+        state.players[self.player].draw_card(self.draw_card)
 
 
 class PengCard(State):
-    def __init__(self, player):
+    def __init__(self, player: PlayerType):
+        """已经选择碰牌后进行的操作"""
         State.__init__(self, 'peng')
         self.player = player
 
-    def do_actions(self):
-        peng_card_id = self.player.manager.last_put
-        peng_card_id_list = []
-        peng_card_cls = self.player.manager.id_to_cls(peng_card_id)
-        k_2_list = self.player.manager.loop_k(self.player.manager.player_list[self.player.player]['now_card'],
-                                              k_count=2, l_cls=[])
-        for k_2_cls_num in range(len(k_2_list['cls'])):
-            if peng_card_cls in k_2_list['cls'][k_2_cls_num]:
-                peng_card_id_list = k_2_list['id'][k_2_cls_num]
+    def do_actions(self, state: GameState):
+        player = state.players[self.player]
+        peng_card = state.interrupt_card
+        peng_cards = Cards([peng_card])
+
+        all_duizi = Referee.get_all_kezi(player.hands, k_count=2)
+        for duizi in all_duizi:
+            if peng_card.cls == duizi[0].cls:
+                peng_cards += duizi
                 break
-        peng_card_id_list.append(peng_card_id)
-        self.player.manager.move_card_to_peng(peng_card_id_list, self.player.player)
+            
+        player.peng_card(peng_cards)
+        
         card_num = 0
-        gang_num = len(self.player.manager.player_list[self.player.player]['put_card']['g']) // 4
-        peng_num = len(self.player.manager.player_list[self.player.player]['put_card']['p']) // 3
-        move_dis = (gang_num + peng_num - 1) * (16 + 3 * self.player.printer.p[0])
-        self.player.peng_cls_list.append((peng_card_cls, move_dis))
+        gang_num = len(player.gangs)
+        peng_num = len(player.pengs)
+        
+        move_dis = (gang_num + peng_num - 1) * (16 + 3 * LOCATION_AND_SIZE.card_width)
+        
         if move_dis < 0:
             move_dis = 0
-        for peng_card_id in peng_card_id_list:
-            card = self.player.manager.table.get(peng_card_id)
-            location = self.player.printer.peng_place[self.player.player]
-            if self.player.player == 1:
-                if card.player != 1:
-                    if card.player == 2:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                    elif card.player == 4:
-                        card.image = pygame.transform.rotate(card.image, 90)
-                    card.player = 1
-                    card.size = [card.image.get_width(), card.image.get_height()]
+            
+        for logic_card in peng_cards:
+
+            location = LOCATION_AND_SIZE.peng_place[self.player]
+            card = state.table[logic_card.id]
+            if self.player == PlayerType.DONG or self.player == PlayerType.XI:
+                if card.owner != self.player:
+                    if card.owner == PlayerType.NAN:
+                        card.face = pygame.transform.rotate(card.face, 270)
+                    elif card.owner == PlayerType.BEI:
+                        card.face = pygame.transform.rotate(card.face, 90)
+                        
+                    card.owner = self.player
+                    card.size = [LOCATION_AND_SIZE.card_width, LOCATION_AND_SIZE.card_height]
 
                 card.destination = Vec2d(location[0] - (card.size[0] + 1) * card_num - move_dis, location[1])
-                card.show_flag = True
-                card.is_player_card = False
+                card.show = True
                 card.speed = 1000
-            elif self.player.player == 2:
-                if card.player != 2:
-                    if card.player == 1 or card.player == 3:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                        card.image = pygame.transform.rotate(card.image, 180)
+                
+            elif self.player == PlayerType.NAN:
+                if card.owner != self.player:
+                    if card.owner == PlayerType.DONG or card.owner == PlayerType.XI:
+                        # card.face = pygame.transform.rotate(card.image, 270)
+                        # card.image = pygame.transform.rotate(card.image, 180)
+                        card.face = pygame.transform.rotate(card.face, 90)
                     else:
-                        card.image = pygame.transform.rotate(card.image, 180)
-                    card.player = 2
-                    card.size = [card.image.get_width(), card.image.get_height()]
+                        card.face = pygame.transform.rotate(card.face, 180)
+                        
+                    card.owner = self.player
+                    card.size = [LOCATION_AND_SIZE.card_width, LOCATION_AND_SIZE.card_height]
 
                 card.destination = Vec2d(location[0], location[1] + (card.size[1] + 1) * card_num + move_dis)
-                card.show_flag = True
-                card.is_player_card = False
+                card.show = True
                 card.speed = 1000
-            elif self.player.player == 3:
-                if card.player != 3:
-                    if card.player == 2:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                    elif card.player == 4:
-                        card.image = pygame.transform.rotate(card.image, 90)
-                    card.player = 3
-                    card.size = [card.image.get_width(), card.image.get_height()]
-
-                card.destination = Vec2d(location[0] + (card.size[0] + 1) * card_num + move_dis, location[1])
-                card.show_flag = True
-                card.is_player_card = False
-                card.speed = 1000
+                
             else:
-                if card.player != 4:
-                    if card.player == 1 or card.player == 3:
-                        card.image = pygame.transform.rotate(card.image, -90)
+                if card.owner != self.player:
+                    if card.owner == PlayerType.DONG or card.owner == PlayerType.XI:
+                        card.face = pygame.transform.rotate(card.face, -90)
                     else:
-                        card.image = pygame.transform.rotate(card.image, 180)
-                    card.player = 4
-                    card.size = [card.image.get_width(), card.image.get_height()]
+                        card.face = pygame.transform.rotate(card.face, 180)
+                    card.owner = self.player
+                    card.size = [LOCATION_AND_SIZE.card_width, LOCATION_AND_SIZE.card_height]
 
                 card.destination = Vec2d(location[0], location[1] - (card.size[1] + 1) * card_num - move_dis)
-                card.show_flag = True
-                card.is_player_card = False
+                card.show = True
                 card.speed = 1000
+                
             card_num += 1
 
-    def check_conditions(self):
+    def check_conditions(self, **args):
         return 'putting'
 
-    def exit_actions(self):
-        if self.player.manager.peng_player != 1:
-            self.player.manager.last_player = self.player.manager.peng_player - 1
-        else:
-            self.player.manager.last_player = 4
-        self.player.manager.peng_player = 0
-        self.player.manager.pg_state_list = []
+    def exit_actions(self, state: GameState):
+        state.next_player()
+        state.interrupt_player = PlayerType.EMPTY
+        state.interrupt_states.clear()
 
 
 class GangCard(State):
-    pass
 
-    def __init__(self, player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'gang')
         self.player = player
 
-    def __init__(self, player):
-        State.__init__(self, 'gang')
-        self.player = player
-
-    def do_actions(self):
-        gang_card = self.player.manager.get(self.player.manager.last_put)
-        k_4_list = self.player.manager.loop_k(self.player.manager.player_list[self.player.player]['now_card'] +
-                                              self.player.manager.player_list[self.player.player]['put_card']['p'] +
-                                              [gang_card],
-                                              k_count=4, l_cls=[])
-        if len(k_4_list['id']) == 0:
-            print(self.player.manager.player_list[self.player.player]['now_card'] +
-                  self.player.manager.player_list[self.player.player]['put_card']['p'] +
-                  [gang_card])
-        gang_card_id_list = k_4_list['id'][0]
-        self.player.manager.move_card_to_gang(gang_card_id_list, self.player.player)
+    def do_actions(self, state: GameState):
+        player = state.players[self.player]
+        gang_card = state.interrupt_card
+        gang_cards = Cards([gang_card])
+        all_kezi = Referee.get_all_kezi(player.hands) + player.pengs
+        
+        for kezi in all_kezi:
+            if gang_card.cls == kezi[0].cls:
+                gang_cards += kezi
+        
+        player.gang_card(gang_cards)
+        
         card_num = 0
-        gang_num = len(self.player.manager.player_list[self.player.player]['put_card']['g']) // 4
-        peng_num = len(self.player.manager.player_list[self.player.player]['put_card']['p']) // 3
-        move_dis = (gang_num + peng_num - 1) * (16 + 3 * self.player.printer.p[0])
-        for peng_card in self.player.peng_cls_list:
-            if self.player.manager.id_to_cls(self.player.draw_card_id) == peng_card[0]:
-                move_dis = peng_card[1]
+        gang_num = len(player.gangs)
+        peng_num = len(player.pengs)
+        move_dis = (gang_num + peng_num - 1) * (16 + 3 * LOCATION_AND_SIZE.card_width)
+        peng_cards_location = None
+        
+        for peng_cards in player.pengs:
+            if state.interrupt_card.cls == peng_cards[0].cls:
+                peng_cards_location = state.table[peng_cards[1].id].location
+                
         if move_dis < 0:
             move_dis = 0
-        for gang_card_id in gang_card_id_list:
-            card = self.player.manager.table.get(gang_card_id)
-            location = self.player.printer.peng_place[self.player.player]
-            if self.player.player == 1:
-                if card.player != 1:
-                    if card.player == 2:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                    elif card.player == 4:
-                        card.image = pygame.transform.rotate(card.image, 90)
-                    card.player = 1
-                    card.size = [card.image.get_width(), card.image.get_height()]
+            
+        for logic_card in gang_cards:
+            card = state.table[logic_card.id]
+            location = LOCATION_AND_SIZE.peng_place[self.player]
+            if self.player == PlayerType.DONG or self.player == PlayerType.XI:
+                if card.owner != self.player:
+                    if card.owner == PlayerType.NAN:
+                        card.face = pygame.transform.rotate(card.face, 270)
+                    elif card.owner == PlayerType.BEI:
+                        card.face = pygame.transform.rotate(card.face, 90)
+                        
+                    card.owner = self.player
+                    card.size = [LOCATION_AND_SIZE.card_width, LOCATION_AND_SIZE.card_height]
 
                 if card_num == 3:
                     card.destination = Vec2d(location[0] - (card.size[0] + 1) * (card_num - 2) - move_dis,
-                                             location[1] - 6)
-                    card.show_flag = True
-                    card.is_player_card = False
+                                             location[1] - 6) if not peng_cards_location else \
+                                       Vec2d(peng_cards_location[0],
+                                             peng_cards_location[1] - 6)
+                    card.show = True
                     card.speed = 1000
                     return
 
                 card.destination = Vec2d(location[0] - (card.size[0] + 1) * card_num - move_dis, location[1])
-                card.show_flag = True
-                card.is_player_card = False
+                card.show = True
                 card.speed = 1000
-            elif self.player.player == 2:
-                if card.player != 2:
-                    if card.player == 1:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                        card.image = pygame.transform.rotate(card.image, 180)
-                    elif card.player == 3:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                    card.player = 2
-                    card.size = [card.image.get_width(), card.image.get_height()]
+                
+            elif self.player == PlayerType.NAN:
+                if card.owner != self.player:
+                    if card.owner == PlayerType.DONG or card.owner == PlayerType.XI:
+                        # card.face = pygame.transform.rotate(card.image, 270)
+                        # card.image = pygame.transform.rotate(card.image, 180)
+                        card.face = pygame.transform.rotate(card.face, 90)
+                    else:
+                        card.face = pygame.transform.rotate(card.face, 180)
+                        
+                    card.owner = self.player
+                    card.size = [LOCATION_AND_SIZE.card_width, LOCATION_AND_SIZE.card_height]
 
                 if card_num == 3:
                     card.destination = Vec2d(location[0] - 6,
-                                             location[1] + (card.size[1] + 1) * (card_num - 2) + move_dis)
-                    card.show_flag = True
-                    card.is_player_card = False
+                                             location[1] + (card.size[1] + 1) * (card_num - 2) + move_dis) if not peng_cards_location else \
+                                       Vec2d(peng_cards_location[0] - 6,
+                                             peng_cards_location[1])
+                    card.show = True
                     card.speed = 1000
                     return
 
                 card.destination = Vec2d(location[0], location[1] + (card.size[1] + 1) * card_num + move_dis)
-                card.show_flag = True
-                card.is_player_card = False
-                card.speed = 1000
-            elif self.player.player == 3:
-                if card.player != 3:
-                    if card.player == 2:
-                        card.image = pygame.transform.rotate(card.image, 270)
-                    elif card.player == 4:
-                        card.image = pygame.transform.rotate(card.image, 90)
-                    card.player = 3
-                    card.size = [card.image.get_width(), card.image.get_height()]
-
-                if card_num == 3:
-                    card.destination = Vec2d(location[0] + (card.size[0] + 1) * (card_num - 2) + move_dis,
-                                             location[1] + 6)
-                    card.show_flag = True
-                    card.is_player_card = False
-                    card.speed = 1000
-                    return
-
-                card.destination = Vec2d(location[0] + (card.size[0] + 1) * card_num + move_dis, location[1])
-                card.show_flag = True
-                card.is_player_card = False
+                card.show = True
                 card.speed = 1000
             else:
-                if card.player != 4:
-                    if card.player == 1 or card.player == 3:
-                        card.image = pygame.transform.rotate(card.image, -90)
+                if card.owner != self.player:
+                    if card.owner == PlayerType.DONG or card.owner == PlayerType.XI:
+                        card.face = pygame.transform.rotate(card.face, -90)
                     else:
-                        card.image = pygame.transform.rotate(card.image, 180)
-                    card.player = 4
-                    card.size = [card.image.get_width(), card.image.get_height()]
+                        card.face = pygame.transform.rotate(card.face, 180)
+                    card.owner = self.player
+                    card.size = [LOCATION_AND_SIZE.card_width, LOCATION_AND_SIZE.card_height]
 
                 if card_num == 3:
                     card.destination = Vec2d(location[0] + 6,
-                                             location[1] - (card.size[1] + 1) * (card_num - 2) - move_dis)
-                    card.show_flag = True
-                    card.is_player_card = False
+                                             location[1] - (card.size[1] + 1) * (card_num - 2) - move_dis) if not peng_cards_location else \
+                                       Vec2d(peng_cards_location[0] + 6,
+                                             peng_cards_location[1])
+                    card.show = True
                     card.speed = 1000
                     return
 
                 card.destination = Vec2d(location[0], location[1] - (card.size[1] + 1) * card_num - move_dis)
-                card.show_flag = True
-                card.is_player_card = False
+                card.show= True
                 card.speed = 1000
             card_num += 1
 
-    def check_conditions(self):
+    def check_conditions(self, **args):
         return 'drawing'
 
-    def exit_actions(self):
-        if self.player.manager.peng_player != 1:
-            self.player.manager.last_player = self.player.manager.peng_player - 1
-        else:
-            self.player.manager.last_player = 4
-        self.player.manager.peng_player = 0
-        self.player.manager.pg_state_list = []
+    def exit_actions(self, state: GameState):
+        state.next_player()
+        state.interrupt_player = PlayerType.EMPTY
+        state.interrupt_states.clear()
 
 
 class Hu(State):
-    def __init__(self, player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'hu')
         self.player = player
 
-    def entry_actions(self):
-        judgement = self.player.manager.judge(self.player.manager.player_list[self.player.player]['now_card'])
-        self.player.printer.set_text(judgement, self.player.player)
-        for player in players:
+    def entry_actions(self, state: GameState):
+        state.table.set_text(True, self.player)
+        for player in state.players:
             player.brain.set_state('end')
-        self.player.manager.last_winner = self.player.player
+        state.winner = self.player
 
 
 class End(State):
-    def __init__(self, player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'end')
         self.player = player
 
 
 class Choice(State):
-    def __init__(self, player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'choosing')
         self.player = player
         self.font_id = 0
@@ -401,28 +363,26 @@ class Choice(State):
         self.last_card = None
         self.choice = 'guo'
 
-    def entry_actions(self):
+    def entry_actions(self, state: GameState):
         self.font_id = 0
-        if len(self.player.choice_state_list) <= 1:
-            self.player.choice_state_list = self.player.manager.pg_state_list
-        if not self.player.use_ai:
-            self.player.printer.set_font(copy.deepcopy(self.player.choice_state_list), self.player.player)
-        if self.player.manager.peng_player != 0:
-            peng_card = self.player.manager.table.get(self.player.manager.peng_card['id'])
-            self.last_place = peng_card.location
-            self.last_card = peng_card
-            peng_card.location = Vec2d(*render_config.CENTER_POS)
-            peng_card.destination = Vec2d(*render_config.CENTER_POS)
-        # print(self.player.choice_state_list)
+            
+        if not state.players[self.player].use_ai:
+            state.table.set_font(state.interrupt_states)
+            
+        peng_card = state.table[state.interrupt_card.id]
+        self.last_place = peng_card.location
+        self.last_card = peng_card
+        peng_card.location = Vec2d(*render_config.CENTER_POS)
+        peng_card.destination = Vec2d(*render_config.CENTER_POS)
 
-    def do_actions(self):
-        if not self.player.use_ai:
+    def do_actions(self, state: GameState):
+        if not state.players[self.player].use_ai:
             mouse_point = pygame.mouse.get_pos()
             pressed_mouse = pygame.mouse.get_pressed()
             if pressed_mouse[0]:
-                self.font_id = printer.follow_mouse(mouse_point, self.font_id, self.player.player)
+                self.font_id = state.table.follow_mouse(mouse_point, self.font_id, self.player)
                 if self.font_id >= 200:
-                    self.choice = self.player.choice_state_list[self.font_id - 200]
+                    self.choice = state.interrupt_states[self.font_id - 200]
                     return
                 self.font_id = 0
         else:
@@ -432,116 +392,39 @@ class Choice(State):
                                                 self.player.choice_state_list)
             self.font_id = 200
 
-    def check_conditions(self):
+    def check_conditions(self, state: GameState):
         if self.font_id >= 200:
             if self.choice == 'guo':
-                if 'hu' in self.player.choice_state_list or \
-                        ('gang' in self.player.choice_state_list and
-                         (self.player.manager.last_player + 1 == self.player.player or
-                          (self.player.player == 1 and self.player.manager.last_player == 4))):
-                    self.player.manager.pg_state_list = []
-                    self.player.choice_state_list = []
+                if 'hu' in state.interrupt_states or \
+                    ('gang' in state.interrupt_states and state.interrupt_player == self.player):
+                    state.interrupt_states = []
                     return 'putting'
-                self.player.manager.pg_state_list = []
-                self.player.choice_state_list = []
-                if self.player.manager.peng_player != 0:
-                    self.last_card.location = self.last_place
-                    self.last_card.destination = self.last_place
-                self.player.manager.peng_player = 0
+                state.interrupt_states = []
+                self.last_card.location = self.last_place
+                self.last_card.destination = self.last_place
+                state.interrupt_player = PlayerType.EMPTY
                 return 'waiting'
             else:
                 return self.choice
         else:
             return None
 
-    def exit_actions(self):
+    def exit_actions(self, state: GameState):
         self.font_id = 0
-        self.player.printer.remove_font()
+        state.table.remove_font()
 
 
 class Wait(State):
-    def __init__(self, player):
+    def __init__(self, player: PlayerType):
         State.__init__(self, 'waiting')
         self.player = player
 
-    def check_conditions(self):
-        if self.player.manager.peng_player == self.player.player:
+    def check_conditions(self, game_state: GameState):
+        if game_state.interrupt_player == self.player:
             return 'choosing'
         else:
-            if self.player.manager.peng_player != 0:
-                return None
-            if self.player.manager.last_player + 1 == self.player.player or (
-                    self.player.manager.last_player == 4 and self.player.player == 1):
+            if self.player == game_state.now_player:
                 return 'drawing'
             else:
                 return None
-        
-
-class GameState:
-    def __init__(self, table: Table) -> None:
-        self.cards = Cards(card_mode=base_config.CARD_MODE)
-        self.players = self.init_player()
-        
-        self.last_player = base_config.INIT_PLAYER
-        self.interrupt_player = PlayerType.EMPTY
-        
-        self.table = table
-    
-    def init_player(self):
-        players: List[Player] = []
-        for player_type in PlayerType:
-            if player_type == PlayerType.EMPTY:
-                continue
-            if player_type == base_config.INIT_PLAYER:
-                players.append(Player(player_type, use_ai=False))
-            else:
-                players.append(Player(player_type, use_ai=True))
-        return players
-    
-    def check_interrupt(self, card_id: int, now_player: PlayerType, is_putting: bool = False, is_drawing: bool = False):
-        interrupt_states = [InterruptState.GUO]
-        interrupt_card = self.cards[card_id]
-        self.last_player = now_player
-        
-        if is_putting:
-            if interrupt_card.type == CardType.HUA:
-                return []
             
-            for player in self.players:
-                if player.player_type == now_player:
-                    continue
-                all_duizi = Referee.get_all_kezi(player.hands, k_count=2)
-                all_kezi = Referee.get_all_kezi(player.hands, k_count=3)
-                
-                for duizi in all_duizi:
-                    if put_cls in list(map(lambda x: x.cls, duizi)):
-                        for kezi in all_kezi:
-                            if put_cls in list(map(lambda x: x.cls, kezi)):
-                                interrupt_states.append(InterruptState.PENG)
-                                interrupt_states.append(InterruptState.GANG)
-                                
-                                self.interrupt_player = player
-                                return interrupt_states
-                        interrupt_states.append(InterruptState.PENG)
-                        self.interrupt_player = player
-                        return interrupt_states
-                    
-            return []
-        elif is_drawing:
-            if len(self.players[now_player].pengs + Referee.get_all_kezi(self.players[now_player].hands, k_count=3)) > 0:
-                 interrupt_states.append(InterruptState.GANG)
-            if Referee.check_win(self.players[now_player].hands + interrupt_card):
-                interrupt_states.append(InterruptState.HU)
-            
-            return interrupt_states
-    
-    def check_state(self, card_id: int, LogicCard_list):
-        state_list = []
-        LogicCard = self.get(card_id)
-        LogicCard_list['now_LogicCard'].append(LogicCard)
-        k_count = self.loop_k(LogicCard_list['now_LogicCard'] + LogicCard_list['put_LogicCard']['p'], k_count=4, l_cls=[])
-        if len(k_count['cls']) > 0:
-            state_list.append('gang')
-        if self.judge(LogicCard_list['now_LogicCard'])['is_win']:
-            state_list.append('hu')
-        return state_list

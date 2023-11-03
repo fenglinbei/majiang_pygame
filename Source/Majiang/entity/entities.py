@@ -7,10 +7,13 @@ import pygame
 from pygame import Surface
 from typing import Dict, List, Optional, Tuple
 
-from config import render_config
+from config import render_config, asset_config, base_config
 from utils.vector import Vec2d
 from utils.constants import PlayerType, Color
 from logic.elements import LogicCard
+from processor.processor import Processor
+from render.render import LOCATION_AND_SIZE
+from logic.player import Player
 
 
 class Entity:
@@ -19,10 +22,8 @@ class Entity:
         self.location = Vec2d(0, 0)
         self.destination = Vec2d(0, 0)
         self.speed: int = 0
+        self.render = False
     
-    def render(self):
-        pass
-
 
 class Card(Entity):
 
@@ -39,6 +40,7 @@ class Card(Entity):
 
         self.face = face
         self.back = back
+        self.render = False
         self.size = [face.get_width(), face.get_height()]
         self.owner = owner # 手牌拥有者
         self.speed = render_config.CARD_MOVEMENT_SPEED
@@ -50,9 +52,6 @@ class Card(Entity):
         self.cls = logic_card.cls
         self.type = logic_card.type
         self.num = logic_card.num
-
-    def render(self, surface: Surface):
-        surface.blit(self.back, self.location) if self.show else surface.blit(self.back, self.location)
 
     def process(self, time_passed_seconds: float):
         if self.speed > 0. and self.location != self.destination:
@@ -73,11 +72,22 @@ class Font(Entity):
 
 class Table(Entity):
     def __init__(self):
+        self.assets = Processor(
+            card_face_image_path=asset_config.CARD_FACE_PATH,
+            card_back_image_path=asset_config.CARD_BACK_PATH,
+            font_image_path=asset_config.FONT_PATH
+            ).get_assets()
+        
         self.back_ground = pygame.surface.Surface((render_config.SCREEN_WIDTH, render_config.SCREEN_HEIGHT)).convert()
         self.back_ground.fill(Color.WHITE)
 
         pygame.draw.circle(self.back_ground, Color.PALE_GREEN, render_config.CENTER_POS, render_config.RADIUS)
         self.entities: Dict[int, Card] = {}
+        self.text = ""
+        
+        self.show_players = [base_config.INIT_PLAYER]
+        
+        self.pw, self.ph = self.assets.card_width + 1, self.assets.card_height + 1
 
     def add_entity(self, entity: Entity):
         self.entities[entity.id] = entity
@@ -101,7 +111,7 @@ class Table(Entity):
                 0 <= (pos[0] - entity.location[0]) <= entity.size[0] and \
                 0 <= (pos[1] - entity.location[1]) <= entity.size[1]:
                 return entity.id
-        return None
+        return -1
 
     def __getitem__(self, entity_id: int):
         return self.entities[entity_id]
@@ -123,18 +133,109 @@ class Table(Entity):
                 card.destination = card.location
                 return entity_id
         return entity_id
+    
+    def set_text(self, is_win: bool, player: str):
+        if is_win:
+            self.text = 'winner is %d' % player
+        else:
+            self.text = 'game over'
+    
+    def set_font(self, state_list: List[str]):
+        state_num = 0
+        for state in state_list:
+            font = Font(asset=self.assets.fonts[state])
+            font.location = Vec2d(LOCATION_AND_SIZE.font_place[0] - (state_num * (self.assets.font_width + 16)), LOCATION_AND_SIZE.font_place[1])
+            font.destination = font.location
+            font.id = 200 + state_num
+            self.add_entity(font)
+            state_num += 1
+
+    def remove_font(self):
+        for state_num in range(200, 204):
+            try:
+                self.remove_entity(state_num)
+            except:
+                return
+            
+    def load_cards(self, all_cards: List[LogicCard]):
+        # 加载所有的卡背与卡面
+        for logic_card in all_cards:
+                
+            card = Card(
+                face=self.assets.card_faces[logic_card.cls],
+                back=self.assets.card_back,
+                card_id=logic_card.id)
+            
+            self.entities[logic_card.id] = card
+    
+    def update_cards(self, players: List[Player]):
+        for player in players:
+            
+            if player.brain.active_state.name in ["putting", "drawing", "peng", "gang"]:
+                
+                for index, logic_card in enumerate(player.hands):
+                    card = self.entities[logic_card.id]
+                    
+                    if player.player_type == PlayerType.DONG:
+                        card.location = Vec2d(
+                            LOCATION_AND_SIZE[player.player_type][1][0] - index * self.pw,
+                            LOCATION_AND_SIZE[player.player_type][1][1]
+                            )
+                    
+                    elif player.player_type == PlayerType.NAN:
+                        card.location = Vec2d(
+                            LOCATION_AND_SIZE[player.player_type][1][0],
+                            LOCATION_AND_SIZE[player.player_type][1][1] + index * self.pw
+                            )
+                        card.face = pygame.transform.rotate(card.face, 90)
+                        card.back = pygame.transform.rotate(card.back, 90)
+                    elif player.player_type == PlayerType.XI:
+                        card.location = Vec2d(
+                            LOCATION_AND_SIZE[player.player_type][1][0] + index * self.pw,
+                            LOCATION_AND_SIZE[player.player_type][1][1])
+
+                    elif player.player_type == PlayerType.BEI:
+                        card.location = Vec2d(
+                            LOCATION_AND_SIZE[player.player_type][1][0],
+                            LOCATION_AND_SIZE[player.player_type][1][1] - index * self.pw)
+                        card.face = pygame.transform.rotate(card.face, 270)
+                        card.back = pygame.transform.rotate(card.back, 90)
+                    
+            if player.brain.active_state.name == "putting":
+                
+                for logic_card in player.puts:
+                    card = self.entities[logic_card.id]
+                    
+                    if player.player_type == PlayerType.DONG:
+                        card.location = Vec2d(LOCATION_AND_SIZE[player.player_type][0][0] + (index % 8) * self.pw,
+                                            LOCATION_AND_SIZE[player.player_type][0][1] + (index // 8) * self.ph)
+                    elif player.player_type == PlayerType.NAN:
+                        card.location = Vec2d(LOCATION_AND_SIZE[player.player_type][0][0] + (index // 8) * self.ph,
+                                            LOCATION_AND_SIZE[player.player_type][0][1] - (index % 8) * self.pw)
+                        card.face = pygame.transform.rotate(card.face, 90)
+                        card.back = pygame.transform.rotate(card.back, 90)
+                    elif player.player_type == PlayerType.XI:
+                        card.location = Vec2d(LOCATION_AND_SIZE[player.player_type][0][0] - (index % 8) * self.pw,
+                                            LOCATION_AND_SIZE[player.player_type][0][1] - (index // 8) * self.ph)
+                    elif player.player_type == PlayerType.BEI:
+                        card.location = Vec2d(LOCATION_AND_SIZE[player.player_type][0][0] - (index // 8) * self.ph,
+                                            LOCATION_AND_SIZE[player.player_type][0][1] + (index % 8) * self.pw)
+                        card.face = pygame.transform.rotate(card.face, 270)
+                        card.back = pygame.transform.rotate(card.back, 90)
+                        
+                card.destination = card.location
+                card.can_followed = False
+                card.show = True
+    
+    def clean_card(self):
+        for card in self.entities.values():
+            card.render = False
+                        
 
     def process(self, time_passed_ms: float):
         time_passed_seconds = time_passed_ms / 1000.0
         entities = copy.copy(self.entities)
         for entity in entities.values():
             entity.process(time_passed_seconds)
-
-    def render(self, surface: Surface, show_player_list: Optional[List[PlayerType]] = []):
-        surface.blit(self.back_ground, (0, 0))
-        for entity in self.entities.values():
-            if entity.owner in show_player_list:
-                entity.show = True
-                entity.render(surface)
 
 

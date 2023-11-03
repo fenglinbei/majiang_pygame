@@ -6,6 +6,7 @@ class PlayerType(IntEnum):
     NAN = 2
     XI = 3
     BEI = 4
+        
 
 class Color:
     BLACK = (0, 0, 0)

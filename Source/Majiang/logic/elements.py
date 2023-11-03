@@ -80,7 +80,7 @@ class Cards:
     def add(self, card: LogicCard):
         self.items[card.id] = card
     
-    def get(self, card_id: int):
+    def get(self, card_id: int) -> LogicCard:
         return self.items[card_id]
     
     def remove(self, card: LogicCard):

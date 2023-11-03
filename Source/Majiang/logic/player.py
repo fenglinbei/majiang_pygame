@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Union
 
-from logic.state import StateMachine, GameState
+from logic.state import StateMachine, PutCard, DrawCard, PengCard, GangCard, Hu, Wait, Choice, End
 from utils.constants import PlayerType
 from logic.elements import LogicCard, Cards
 
@@ -35,20 +35,36 @@ class Player:
                 self.puts.add(card)
                 self.hands.remove(card)
                 break
+    
+    def draw_card(self, card: Union[LogicCard, Cards]):
+        if isinstance(card, Cards):
+            self.hands + card
+        else:
+            self.hands.add(card)
+        
+    def peng_card(self, cards: Cards):
+        self.pengs.append(cards)
+        for card in cards:
+            self.hands.remove(card)
+            
+    def gang_card(self, cards: Cards):
+        self.gangs.append(cards)
+        for card in cards:
+            self.hands.remove(card)
         
         
-    def think(self):
-        self.brain.think()
+    def think(self, game_state):
+        self.brain.think(game_state)
         
     def init_state(self):
-        put_state = PutCard(self)
-        draw_state = DrawCard(self)
-        peng_state = PengCard(self)
-        gang_state = GangCard(self)
-        hu_state = Hu(self)
-        wait_state = Wait(self)
-        choice_state = Choice(self)
-        end_state = End(self)
+        put_state = PutCard(self.player_type)
+        draw_state = DrawCard(self.player_type)
+        peng_state = PengCard(self.player_type)
+        gang_state = GangCard(self.player_type)
+        hu_state = Hu(self.player_type)
+        wait_state = Wait(self.player_type)
+        choice_state = Choice(self.player_type)
+        end_state = End(self.player_type)
         
         self.brain.add_state(put_state)
         self.brain.add_state(draw_state)
