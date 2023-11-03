@@ -16,6 +16,6 @@ def test(fun, count: int = 100000):
                 result = fun(*args, **kwargs)
             result = fun(*args, **kwargs)
             end_time = time.time()
-            print(f"{fun.__name__} 共运行{count}次，运行时间为 {(end_time - start_time) * 1000} 毫秒")
+            print(f"{fun.__name__} 共运行{count}次，运行时间为 {(end_time - start_time) * 1000} 毫秒， 平均每次 {(end_time - start_time) * 1000 / count} 毫秒")
             return result
         return runner

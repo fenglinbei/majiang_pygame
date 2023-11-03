@@ -10,7 +10,7 @@ import copy
 from typing import List, Optional, Tuple, Dict
 
 from config import base_config
-from logic.elements import Cards,LogicCard
+from logic.elements import Cards, LogicCard
 from utils.constants import (
     CardType,
     BASE_CARD_TYPE
@@ -146,9 +146,8 @@ class Referee:
             count = 1
 
             for i in range(index + 1, card_nums):
-                
                 if card.cls == cards[i].cls and \
-                    card.cls != all_kezi[-1][0].cls if all_kezi else True:
+                    (card.cls != all_kezi[-1][0].cls if all_kezi else True):
                     count += 1
                     kezi.append(cards[i])
                     if count == k_count:
@@ -161,7 +160,7 @@ class Referee:
         return all_kezi
 
     @staticmethod
-    def _evaluate(self, cards: List[LogicCard], depth: int = 0, now_max_depth: int = 0, max_depth: int = 4):
+    def _evaluate(cards: List[LogicCard], depth: int = 0, now_max_depth: int = 0, max_depth: int = 4):
         all_kanzi = Referee.get_all_shunzi(cards) + Referee.get_all_kezi(cards)
 
         if len(all_kanzi) == 0:
@@ -185,30 +184,33 @@ class Referee:
         
         return now_max_depth
 
-    def check_win(self, cards: List[LogicCard]):
+    @staticmethod
+    def check_win(cards: List[LogicCard]):
         '''胡牌判定'''
         
         # 找出所有对子
         all_duizi = Referee.get_all_kezi(cards, k_count=2)
         
-        max_kan_nums = len(cards) // 3
+        win_kan_nums = len(cards) // 3
         
         for duizi in all_duizi:
             
             evaluate_cards = copy.deepcopy(cards)
-            for LogicCard in duizi:
-                evaluate_cards.remove(LogicCard)
             
-            if max_kan_nums == Referee._evaluate(evaluate_cards, max_depth=max_kan_nums):
+            for card in duizi:
+                evaluate_cards.remove(card)
+            
+            if win_kan_nums == Referee._evaluate(evaluate_cards, max_depth=win_kan_nums):
                 return True
 
         return False
     
 if __name__ == "__main__":
+    import time
     from pprint import pprint
     from utils.constants import CardMode
     from utils.time_counter import run_time, test
-    all_cards = Cards(card_mode=CardMode.FULL)
+    all_cards = Cards(card_mode=CardMode.NOT_HUA)
     
     def gen_random_cards(count: int):
         random_cards = []
@@ -216,32 +218,61 @@ if __name__ == "__main__":
             random_cards.append(all_cards.draw(14, replace=True))
         return random_cards
     
-    # def test_fun(fun: function, cards_count: int, per_card_test: int):
-    #     for i in 
-    #     test(fun, per_card_test)
+    def test_fun(fun: function, cards_count: int, per_card_test: int):
+        test_cards = gen_random_cards(cards_count)
+
+        start_time = time.time()
+        for cards in test_cards:
+            for i in range(per_card_test):
+                res = fun(cards)
+            if res:
+                pprint(sorted(cards.to_list(), key=lambda x: x.id))
+        end_time = time.time()
+        print(f"{fun.__name__} 共运行{cards_count *  per_card_test}次，运行时间为 {(end_time - start_time) * 1000} 毫秒， 平均每次 {(end_time - start_time) * 1000 / (cards_count *  per_card_test)} 毫秒")
     
     
-    cards = Cards([
-        all_cards.get(0),
-        all_cards.get(1),
-        all_cards.get(2),
+    # cards = Cards([
+    #     all_cards.get(0),
+    #     all_cards.get(1),
+    #     all_cards.get(2),
         
-        all_cards.get(4),
-        all_cards.get(8),
-        all_cards.get(12),
-        all_cards.get(16),
-        all_cards.get(20),
-        all_cards.get(24),
-        all_cards.get(28),
+    #     all_cards.get(4),
+    #     all_cards.get(8),
+    #     all_cards.get(12),
+    #     all_cards.get(16),
+    #     all_cards.get(20),
+    #     all_cards.get(24),
+    #     all_cards.get(28),
         
-        all_cards.get(32),
-        all_cards.get(33),
-        all_cards.get(34),
+    #     all_cards.get(32),
+    #     all_cards.get(33),
+    #     all_cards.get(34),
         
-        all_cards.get(13)
-    ])
-    # print(cards)
+    #     all_cards.get(13)
+    # ])
+    # cards = Cards([
+    #     all_cards.get(71),
+    #     all_cards.get(34),
+    #     all_cards.get(122),
+        
+    #     all_cards.get(46),
+    #     all_cards.get(123),
+    #     all_cards.get(25),
+    #     all_cards.get(35),
+    #     all_cards.get(48),
+    #     all_cards.get(128),
+    #     all_cards.get(43),
+        
+    #     all_cards.get(76),
+    #     all_cards.get(68),
+    #     all_cards.get(103),
+        
+    #     all_cards.get(54)
+    # ])
+    # cards = gen_random_cards(1)[0]
+    # pprint(cards)
             
             
-    
-    pprint(test(Referee.check_win)(cards))
+    test_fun(Referee.check_win, cards_count=1000000, per_card_test=1)
+    # pprint(test(Referee.check_win, count=10000)(cards))
+    # pprint(test(Referee.get_all_kezi)(cards))

@@ -19,36 +19,36 @@ class CardMode(IntEnum):
 
 class CardType(IntEnum):
 
-    WANG = 0
-    TONG = 1
+    WANG = 1
+    TONG = 2
     SUO = 2
-    FENG = 3
-    JIAN = 4
-    HUA = 5
+    FENG = 4
+    JIAN = 5
+    HUA = 6
 
 BASE_CARD_TYPE = [CardType.WANG, CardType.TONG, CardType.SUO]
 
 class Feng(IntEnum):
-    DONG = 0
-    NAN = 1
-    XI = 2
-    BEI = 3
+    DONG = 1
+    NAN = 2
+    XI = 3
+    BEI = 4
 
 class Jian(IntEnum):
-    ZHONG = 4
-    FA = 5
-    BAI = 6
+    ZHONG = 5
+    FA = 6
+    BAI = 7
 
 
 class Hua(IntEnum):
-    CHUN = 7
-    XIA = 8
-    QIU = 9
-    DONG = 10
-    MEI = 11
-    LAN = 12
-    ZHU = 13
-    JU = 14
+    CHUN = 1
+    XIA = 2
+    QIU = 3
+    DONG = 4
+    MEI = 5
+    LAN = 6
+    ZHU = 7
+    JU = 8
     
 class InterruptState(IntEnum):
     GUO = 0

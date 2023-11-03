@@ -12,7 +12,17 @@ class LogicCard:
         self.cls = card_cls
     
     def __repr__(self) -> str:
-        return f"<Card: {self.type}, num: {self.num}, cls: {self.cls}, id: {self.id}>"
+        # return f"<Card: {self.type}, num: {self.num}, cls: {self.cls}, id: {self.id}>"
+        if self.type == CardType.WANG:
+            return str(self.num) + "m"
+        elif self.type == CardType.TONG:
+            return str(self.num) + "p"
+        elif self.type == CardType.SUO:
+            return str(self.num) + "s"
+        elif self.type == CardType.FENG or self.type == CardType.JIAN:
+            return str(self.num.value) + "z"
+        elif self.type == CardType.HUA:
+            return str(self.num.value) + "h"
     
     def __eq__(self, __value: object) -> bool:
         if __value.id == self.id:
@@ -29,6 +39,9 @@ class Cards:
             self.items: Dict = {}
         elif card_list:
             self.items = {card.id: card for card in card_list}
+            
+    def __len__(self):
+        return len(self.items)
     
     def __getitem__(self, index: int) -> LogicCard:
         return list(self.items.values())[index]
@@ -49,9 +62,21 @@ class Cards:
     def __repr__(self) -> str:
         return self.to_list().__repr__()
     
+    def __iter__(self):
+        self.index = 0
+        return self
+    
+    def __next__(self):
+        if self.index < len(self.items):
+            result = self.__getitem__(self.index)
+            self.index += 1
+            return result
+        else:
+            raise StopIteration
+    
     def update(self, x):
         self.items.update(x.items)
-    
+
     def add(self, card: LogicCard):
         self.items[card.id] = card
     
